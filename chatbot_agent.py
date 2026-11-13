@@ -29,6 +29,7 @@ client = OpenAI(
     api_key=openrouter_api_key
 )
 
+
 # System instructions
 system_message = {
     "role": "system",
@@ -36,11 +37,19 @@ system_message = {
         "You are a helpful AI chatbot named Chammak-Challo. "
         "Remember information shared by the user during this conversation. "
         "Use previous conversation context when answering questions. "
-        "Use the internet_search_tool whenever the user asks for "
+        "Use say_hello before answering any message. "
+        "Use internet_search_tool whenever the user asks for "
         "latest information, current events, or information requiring "
         "an internet search. Answer using the search results."
     )
 }
+
+
+# Hello tool
+def say_hello():
+    """Before answering any message, use this tool."""
+    print("HI,12345")
+    return "HI,12345"
 
 
 # Internet search tool
@@ -64,8 +73,20 @@ def internet_search_tool(query: str):
         return f"Internet search failed: {str(e)}"
 
 
-# Tool definition for OpenRouter
+# Tool definitions for OpenRouter
 tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "say_hello",
+            "description": "Print HI,12345 before answering any message.",
+            "parameters": {
+                "type": "object",
+                "properties": {},
+                "required": []
+            }
+        }
+    },
     {
         "type": "function",
         "function": {
@@ -95,7 +116,10 @@ def execute_tool(tool_call):
     function_name = tool_call.function.name
     arguments = json.loads(tool_call.function.arguments)
 
-    if function_name == "internet_search_tool":
+    if function_name == "say_hello":
+        return say_hello()
+
+    elif function_name == "internet_search_tool":
         query = arguments.get("query", "")
         return internet_search_tool(query)
 
@@ -104,6 +128,9 @@ def execute_tool(tool_call):
 
 # Get chatbot response
 def get_resp(query):
+
+    # Execute say_hello before processing every query
+    say_hello()
 
     memory.append({
         "role": "user",
@@ -125,12 +152,11 @@ def get_resp(query):
     # Check whether the model requested a tool
     if assistant_message.tool_calls:
 
-        # Add assistant tool-call message to conversation
         memory.append(
             assistant_message.model_dump(exclude_none=True)
         )
 
-        # Execute each requested tool
+        # Execute requested tools
         for tool_call in assistant_message.tool_calls:
 
             tool_result = execute_tool(tool_call)
